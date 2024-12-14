@@ -1,0 +1,43 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up CMake (Ubuntu only)
+      if: runner.os == 'Linux'
+      run: sudo apt-get install -y cmake g++
+
+    - name: Set up CMake (Windows only)
+      if: runner.os == 'Windows'
+      run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build project
+      run: cmake --build build
+
+    - name: Run executable (only for Ubuntu)
+      if: runner.os == 'Linux'
+      run: ./build/hello
+
+    - name: Run executable (only for Windows)
+      if: runner.os == 'Windows'
+      run: .\build\hello.exe
