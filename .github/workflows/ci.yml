@@ -1,43 +1,41 @@
-name: Build and Test
+name: 'C++ CI'
 
 on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+      - feature/github_actions
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-
+    runs-on: ubuntu-latest
+    permissions: write-all
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Set up CMake (Ubuntu only)
-      if: runner.os == 'Linux'
-      run: sudo apt-get install -y cmake g++
-
-    - name: Set up CMake (Windows only)
-      if: runner.os == 'Windows'
-      run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build project
-      run: cmake --build build
-
-    - name: Run executable (only for Ubuntu)
-      if: runner.os == 'Linux'
-      run: ./build/hello
-
-    - name: Run executable (only for Windows)
-      if: runner.os == 'Windows'
-      run: .\build\hello.exe
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - run: sudo apt-get update && sudo apt-get install libboost-test-dev -y
+      - run: cmake . -DPATCH_VERSION=${{ github.run_number }}
+      - run: cmake --build .
+      - run: cmake --build . --target test
+      - run: cmake --build . --target package
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./helloworld-0.0.${{ github.run_number }}-Linux.deb
+          asset_name: helloworld-0.0.${{ github.run_number }}-Linux.deb
+          asset_content_type: application/vnd.debian.binary-package
